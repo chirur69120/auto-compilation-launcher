@@ -1,7 +1,8 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
+const waitOn = require('wait-on');
 
-function createWindow() {
+async function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -14,25 +15,34 @@ function createWindow() {
   // Force development mode
   process.env.NODE_ENV = 'development';
 
-  // Try to connect to the Vite dev server
-  const tryConnection = () => {
-    win.loadURL('http://localhost:5173').catch(() => {
-      console.log('Retrying connection to Vite dev server...');
-      setTimeout(tryConnection, 1000);
+  // Wait for the Vite dev server to start
+  try {
+    await waitOn({
+      resources: ['http://localhost:5173'],
+      timeout: 5000, // 5 seconds timeout
+      validateStatus: function (status) {
+        return status >= 200 && status < 300;
+      }
     });
-  };
-  tryConnection();
+    
+    await win.loadURL('http://localhost:5173');
+  } catch (error) {
+    console.error('Failed to connect to Vite dev server:', error);
+    process.exit(1);
+  }
 
   // Open DevTools in development
-  win.webContents.openDevTools();
+  if (process.env.NODE_ENV === 'development') {
+    win.webContents.openDevTools();
+  }
 }
 
-app.whenReady().then(() => {
-  createWindow();
+app.whenReady().then(async () => {
+  await createWindow();
 
-  app.on('activate', () => {
+  app.on('activate', async () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+      await createWindow();
     }
   });
 });
