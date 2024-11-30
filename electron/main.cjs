@@ -17,32 +17,51 @@ async function createWindow() {
 
   // Wait for the Vite dev server to start
   try {
+    console.log('Waiting for Vite dev server to start...');
     await waitOn({
       resources: ['http://localhost:5173'],
-      timeout: 5000, // 5 seconds timeout
+      timeout: 30000, // Augmenté à 30 secondes
       validateStatus: function (status) {
         return status >= 200 && status < 300;
-      }
+      },
+      interval: 1000, // Vérifie toutes les secondes
     });
     
-    await win.loadURL('http://localhost:5173');
+    if (!win.isDestroyed()) {
+      console.log('Vite dev server is ready, loading application...');
+      await win.loadURL('http://localhost:5173');
+    }
   } catch (error) {
     console.error('Failed to connect to Vite dev server:', error);
-    process.exit(1);
+    if (!win.isDestroyed()) {
+      await win.destroy();
+    }
+    app.quit();
+    return;
   }
 
   // Open DevTools in development
-  if (process.env.NODE_ENV === 'development') {
+  if (process.env.NODE_ENV === 'development' && !win.isDestroyed()) {
     win.webContents.openDevTools();
   }
 }
 
 app.whenReady().then(async () => {
-  await createWindow();
+  try {
+    await createWindow();
+  } catch (error) {
+    console.error('Failed to create window:', error);
+    app.quit();
+  }
 
   app.on('activate', async () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      await createWindow();
+      try {
+        await createWindow();
+      } catch (error) {
+        console.error('Failed to create window on activate:', error);
+        app.quit();
+      }
     }
   });
 });
